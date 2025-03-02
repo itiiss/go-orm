@@ -2,7 +2,9 @@ package session
 
 import (
 	"database/sql"
+	"go-orm/dialect"
 	"go-orm/log"
+	"go-orm/schema"
 	"strings"
 )
 
@@ -10,10 +12,16 @@ type Session struct {
 	db        *sql.DB
 	sql       strings.Builder
 	sqlValues []interface{}
+
+	dialect  dialect.Dialect
+	refTable *schema.Schema
 }
 
-func NewSession(db *sql.DB) *Session {
-	return &Session{db: db}
+func NewSession(db *sql.DB, dialect dialect.Dialect) *Session {
+	return &Session{
+		db:      db,
+		dialect: dialect,
+	}
 }
 
 func (s *Session) Clear() {
