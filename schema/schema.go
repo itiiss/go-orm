@@ -26,6 +26,17 @@ func (s *Schema) GetField(name string) *Field {
 	return s.FieldsMap[name]
 }
 
+// RecordValues 从一个目标对象（dest）中提取出与 Schema 中定义的字段相对应的值
+// 并将这些值存储在一个 interface{} 类型的切片中返回
+func (s *Schema) RecordValues(dest interface{}) []interface{} {
+	destValue := reflect.Indirect(reflect.ValueOf(dest))
+	var fieldValues []interface{}
+	for _, field := range s.Fields {
+		fieldValues = append(fieldValues, destValue.FieldByName(field.Name).Interface())
+	}
+	return fieldValues
+}
+
 // Parse 将任意对象解析成schema实例
 func Parse(dest interface{}, d dialect.Dialect) *Schema {
 	// TypeOf() 和 ValueOf() 是 reflect 包最常用 2 个方法，分别用来返回入参的类型和值。
