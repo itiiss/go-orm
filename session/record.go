@@ -1,6 +1,7 @@
 package session
 
 import (
+	"errors"
 	"go-orm/clause"
 	"reflect"
 )
@@ -61,4 +62,82 @@ func (s *Session) Find(values interface{}) error {
 	}
 
 	return rows.Close()
+}
+
+// Update 接受 2 种入参，平铺开来的键值对和 map 类型的键值对
+func (s *Session) Update(kv ...interface{}) (int64, error) {
+	// 判断传入参数的类型
+	m, ok := kv[0].(map[string]interface{})
+	// 因为 generator 接受的参数是 map 类型的键值对，如果是不是 map 类型，则会自动转换
+	if !ok {
+		m = make(map[string]interface{})
+		for i := 0; i < len(kv); i += 2 {
+			m[kv[i].(string)] = kv[i+1]
+		}
+	}
+
+	s.clause.Set(clause.UPDATE, s.RefTable().Name, m)
+	sql, vars := s.clause.Build(clause.UPDATE, clause.WHERE)
+	result, err := s.Raw(sql, vars...).Exec()
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+func (s *Session) Delete() (int64, error) {
+	s.clause.Set(clause.DELETE, s.RefTable().Name)
+	sql, vars := s.clause.Build(clause.DELETE, clause.WHERE)
+	result, err := s.Raw(sql, vars...).Exec()
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+func (s *Session) Count() (int64, error) {
+	s.clause.Set(clause.COUNT, s.RefTable().Name)
+	sql, vars := s.clause.Build(clause.COUNT, clause.WHERE)
+	row := s.Raw(sql, vars...).QueryRow()
+
+	var tmp int64
+	err := row.Scan(&tmp)
+	if err != nil {
+		return 0, err
+	}
+	return tmp, nil
+}
+
+func (s *Session) Limit(num int) *Session {
+	s.clause.Set(clause.LIMIT, num)
+	return s
+}
+
+func (s *Session) Where(desc string, args ...interface{}) *Session {
+	var vars []interface{}
+	s.clause.Set(clause.WHERE, append(append(vars, desc), args...)...)
+	return s
+}
+
+func (s *Session) OrderBy(desc string) *Session {
+	s.clause.Set(clause.ORDERBY, desc)
+	return s
+}
+
+// First 根据传入的类型，利用反射构造切片
+// 调用 Limit(1) 限制返回的行数，调用 Find 方法获取到查询结果
+func (s *Session) First(values interface{}) error {
+	dest := reflect.Indirect(reflect.ValueOf(values))
+	destSlice := reflect.New(reflect.SliceOf(dest.Type())).Elem()
+
+	err := s.Limit(1).Find(destSlice.Addr().Interface())
+	if err != nil {
+		return err
+	}
+
+	if destSlice.Len() == 0 {
+		return errors.New("not found")
+	}
+	dest.Set(destSlice.Index(0))
+	return nil
 }
