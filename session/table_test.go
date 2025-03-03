@@ -5,7 +5,7 @@ import (
 )
 
 func TestSession_CreateTable(t *testing.T) {
-	s := New().Model(&User{})
+	s := NewTestSession().Model(&User{})
 	_ = s.DropTable()
 	_ = s.CreateTable()
 	if !s.HasTable() {
@@ -14,7 +14,7 @@ func TestSession_CreateTable(t *testing.T) {
 }
 
 func TestSession_Model(t *testing.T) {
-	s := New().Model(&User{})
+	s := NewTestSession().Model(&User{})
 	table := s.RefTable()
 	s.Model(&Session{})
 	if table.Name != "User" || s.RefTable().Name != "Session" {

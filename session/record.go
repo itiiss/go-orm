@@ -11,6 +11,10 @@ import (
 func (s *Session) Insert(values ...interface{}) (int64, error) {
 	recordValues := make([]interface{}, 0)
 	for _, value := range values {
+
+		// hooks： 执行 value 对象上挂载的 BeforeInsert方法
+		s.CallMethod(BeforeInsert, value)
+
 		table := s.Model(value).RefTable()
 		// 构造 Insert子语句
 		// 如果插入多个对象，会执行多次，但是set的结果是相同的
@@ -28,10 +32,13 @@ func (s *Session) Insert(values ...interface{}) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+
+	s.CallMethod(AfterInsert, nil)
 	return result.RowsAffected()
 }
 
 func (s *Session) Find(values interface{}) error {
+	s.CallMethod(BeforeQuery, nil)
 	// 利用反射获取value的反射值和元素类型
 	destSlice := reflect.Indirect(reflect.ValueOf(values))
 	destType := destSlice.Type().Elem()
@@ -58,6 +65,8 @@ func (s *Session) Find(values interface{}) error {
 		if err != nil {
 			return err
 		}
+
+		s.CallMethod(AfterQuery, dest.Addr().Interface())
 		destSlice.Set(reflect.Append(destSlice, dest))
 	}
 
@@ -66,6 +75,7 @@ func (s *Session) Find(values interface{}) error {
 
 // Update 接受 2 种入参，平铺开来的键值对和 map 类型的键值对
 func (s *Session) Update(kv ...interface{}) (int64, error) {
+	s.CallMethod(BeforeUpdate, nil)
 	// 判断传入参数的类型
 	m, ok := kv[0].(map[string]interface{})
 	// 因为 generator 接受的参数是 map 类型的键值对，如果是不是 map 类型，则会自动转换
@@ -82,16 +92,21 @@ func (s *Session) Update(kv ...interface{}) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	s.CallMethod(AfterUpdate, nil)
 	return result.RowsAffected()
 }
 
 func (s *Session) Delete() (int64, error) {
+	s.CallMethod(BeforeDelete, nil)
+
 	s.clause.Set(clause.DELETE, s.RefTable().Name)
 	sql, vars := s.clause.Build(clause.DELETE, clause.WHERE)
 	result, err := s.Raw(sql, vars...).Exec()
 	if err != nil {
 		return 0, err
 	}
+
+	s.CallMethod(AfterDelete, nil)
 	return result.RowsAffected()
 }
 
