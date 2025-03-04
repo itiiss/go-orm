@@ -5,6 +5,7 @@ import (
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
 	"go-orm/session"
+	"reflect"
 	"testing"
 )
 
@@ -78,5 +79,25 @@ func transactionCommit(t *testing.T) {
 	_ = s.First(u)
 	if err != nil || u.Name != "Tom" {
 		t.Fatal("failed to commit")
+	}
+}
+
+func TestEngine_Migrate(t *testing.T) {
+	engine := OpenDB(t)
+	defer engine.Close()
+	s := engine.NewSession()
+	_, _ = s.Raw("DROP TABLE IF EXISTS User;").Exec()
+	// 旧表的两个字段分别是 NAME，AAA
+	_, _ = s.Raw("CREATE TABLE User(Name VARCHAR(255) PRIMARY KEY, AAA INT);").Exec()
+	_, _ = s.Raw("INSERT INTO User(`Name`) values (?), (?)", "Alice", "Bob").Exec()
+
+	// User的两个字段分别是Name,Age
+	engine.Migrate(&User{})
+
+	rows, _ := s.Raw("SELECT * FROM User").QueryRows()
+	columns, _ := rows.Columns()
+	// 迁移后期望得到Name和Age两个字段
+	if !reflect.DeepEqual(columns, []string{"Name", "Age"}) {
+		t.Fatal("Failed to migrate table User, got columns", columns)
 	}
 }
